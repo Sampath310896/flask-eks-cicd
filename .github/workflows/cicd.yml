@@ -1,0 +1,38 @@
+name: CI/CD to AWS EKS
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build & Push Image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/flask-eks:latest .
+        docker push ${{ secrets.DOCKER_USERNAME }}/flask-eks:latest
+
+    - name: Configure AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-south-1
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --name flask-cicd-cluster
+
+    - name: Deploy to EKS
+      run: kubectl apply -f k8s/
